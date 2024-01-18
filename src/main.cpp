@@ -1,8 +1,15 @@
 #include <iostream>
 
-#include "test.h"
+#include "server.h"
 
-int main(int, char**){
-    std::cout << "Hello, from Cpp-web-server!\n";
-    std::cout << foo() << '\n';
+int main() {
+    try {
+        HTTPServer server;
+        std::cout << "Server listening on port 8080" << std::endl;
+        server.run();
+    } catch (const std::exception &e) {
+        std::cerr << "Error: " << e.what() << std::endl;
+        return 1;
+    }
+    return 0;
 }
