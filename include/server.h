@@ -8,6 +8,7 @@
 #include <netinet/in.h>
 #include <fcntl.h>
 #include <sys/epoll.h>
+#include <atomic>
 
 #define MAX_EVENTS 10
 #define MAX_BUFFER_SIZE 1024
@@ -18,9 +19,9 @@ private:
     struct sockaddr_in address;
     const int PORT = 8080;
 
-    void setNonBlocking(int sock);
+    void set_non_blocking(int sock);
 
-    void handleClient(int client_socket);
+    void handle_client(int client_socket);
 
 public:
     HTTPServer();

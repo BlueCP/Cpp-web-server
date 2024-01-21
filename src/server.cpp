@@ -1,11 +1,13 @@
 #include "server.h"
 
-void HTTPServer::setNonBlocking(int sock) {
+extern std::atomic<int> running;
+
+void HTTPServer::set_non_blocking(int sock) {
     int flags = fcntl(sock, F_GETFL, 0);
     fcntl(sock, F_SETFL, flags | O_NONBLOCK);
 }
 
-void HTTPServer::handleClient(int client_socket) {
+void HTTPServer::handle_client(int client_socket) {
     char buffer[MAX_BUFFER_SIZE] = {0};
     ssize_t bytes_read = read(client_socket, buffer, MAX_BUFFER_SIZE);
     
@@ -35,7 +37,7 @@ HTTPServer::HTTPServer() {
         throw std::runtime_error("Failed to listen");
     }
 
-    setNonBlocking(server_fd);
+    set_non_blocking(server_fd);
 
     epoll_fd = epoll_create1(0);
     if (epoll_fd == -1) {
@@ -53,8 +55,8 @@ HTTPServer::HTTPServer() {
 void HTTPServer::run() {
     struct epoll_event events[MAX_EVENTS];
 
-    while (true) {
-        int nfds = epoll_wait(epoll_fd, events, MAX_EVENTS, -1);
+    while (running) {
+        int nfds = epoll_wait(epoll_fd, events, MAX_EVENTS, 100);
         
         for (int n = 0; n < nfds; ++n) {
             if (events[n].data.fd == server_fd) {
@@ -62,7 +64,7 @@ void HTTPServer::run() {
                 if (client_socket == -1) {
                     continue;
                 }
-                setNonBlocking(client_socket);
+                set_non_blocking(client_socket);
                 struct epoll_event event;
                 event.events = EPOLLIN | EPOLLET;
                 event.data.fd = client_socket;
@@ -71,7 +73,7 @@ void HTTPServer::run() {
                     continue;
                 }
             } else {
-                handleClient(events[n].data.fd);
+                handle_client(events[n].data.fd);
             }
         }
     }
@@ -80,4 +82,5 @@ void HTTPServer::run() {
 HTTPServer::~HTTPServer() {
     close(server_fd);
     close(epoll_fd);
+    std::cout << "Sockets closed.\n";
 }
