@@ -1,32 +1,31 @@
 #pragma once
 
-#include <iostream>
+#include <vector>
 #include <string>
-#include <cstring>
-#include <unistd.h>
+#include <atomic>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <fcntl.h>
 #include <sys/epoll.h>
-#include <atomic>
-
-#define MAX_EVENTS 10
-#define MAX_BUFFER_SIZE 1024
+#include <unordered_map>
 
 class HTTPServer {
-private:
-    int server_fd, epoll_fd;
-    struct sockaddr_in address;
-    const int PORT = 8080;
-
-    void set_non_blocking(int sock);
-
-    void handle_client(int client_socket);
-
 public:
-    HTTPServer();
+    HTTPServer(int port = 8080);
+    ~HTTPServer();
 
     void run();
 
-    ~HTTPServer();
+private:
+    void setupServerSocket();
+    void handleClient(int client_socket);
+    std::string getContentType(const std::string& path);
+    std::string readFile(const std::string& path);
+    void addToEpoll(int fd);
+
+    int server_fd;
+    struct sockaddr_in address;
+    const int PORT;
+    int epoll_fd;
+    std::unordered_map<int, std::string> client_buffers;
+    static constexpr int MAX_EVENTS = 10;
 };
