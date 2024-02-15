@@ -1,12 +1,20 @@
 #pragma once
 
-#include <vector>
-#include <string>
 #include <atomic>
+#include <sys/epoll.h>
+#include <netinet/in.h>
+#include <iostream>
+#include <unistd.h>
+#include <fcntl.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <sys/epoll.h>
-#include <unordered_map>
+#include <filesystem>
+#include <fstream>
+
+#include "thread_pool.h"
+#include "file_cache.h"
+#include "request_parser.h"
+#include "response_builder.h"
 
 class HTTPServer {
 public:
@@ -26,6 +34,7 @@ private:
     struct sockaddr_in address;
     const int PORT;
     int epoll_fd;
-    std::unordered_map<int, std::string> client_buffers;
-    static constexpr int MAX_EVENTS = 10;
+    static constexpr int MAX_EVENTS = 64;
+    ThreadPool thread_pool;
+    FileCache file_cache;
 };

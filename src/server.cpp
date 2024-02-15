@@ -1,20 +1,10 @@
-#include <iostream>
-#include <cstring>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <arpa/inet.h>
-#include <fcntl.h>
-#include <algorithm>
-#include <fstream>
-#include <sstream>
-#include <filesystem>
-
 #include "server.h"
 
 extern std::atomic<bool> running;
 
-HTTPServer::HTTPServer(int port) : PORT(port) {
+HTTPServer::HTTPServer(int port)
+    : PORT(port), thread_pool(std::thread::hardware_concurrency()), file_cache(1024 * 1024 * 50)  // 50MB cache
+{
     setupServerSocket();
     epoll_fd = epoll_create1(0);
     if (epoll_fd == -1) {
@@ -26,7 +16,6 @@ HTTPServer::HTTPServer(int port) : PORT(port) {
 HTTPServer::~HTTPServer() {
     close(server_fd);
     close(epoll_fd);
-    std::cout << "Sockets closed.\n";
 }
 
 void HTTPServer::setupServerSocket() {
@@ -63,53 +52,53 @@ void HTTPServer::addToEpoll(int fd) {
 }
 
 void HTTPServer::handleClient(int client_socket) {
-    constexpr int BUFFER_SIZE = 1024;
-    char buffer[BUFFER_SIZE];
-    ssize_t bytes_read;
+    auto task = [this, client_socket]() {
+        char buffer[4096];
+        std::string request_data;
+        ssize_t bytes_read;
 
-    while ((bytes_read = read(client_socket, buffer, BUFFER_SIZE)) > 0) {
-        client_buffers[client_socket].append(buffer, bytes_read);
-    }
-
-    if (bytes_read == -1 && errno != EAGAIN) {
-        std::cerr << "Error reading from socket" << std::endl;
-        close(client_socket);
-        client_buffers.erase(client_socket);
-        return;
-    }
-
-    if (bytes_read == 0 || client_buffers[client_socket].find("\r\n\r\n") != std::string::npos) {
-        std::istringstream iss(client_buffers[client_socket]);
-        std::string method, path, protocol;
-        iss >> method >> path >> protocol;
-
-        if (path == "/") {
-            path = "/index.html";
+        while ((bytes_read = read(client_socket, buffer, sizeof(buffer))) > 0) {
+            request_data.append(buffer, bytes_read);
         }
 
-        path = "../serve" + path;
+        if (bytes_read == -1 && errno != EAGAIN) {
+            std::cerr << "Error reading from socket" << std::endl;
+            close(client_socket);
+            return;
+        }
+
+        HTTPRequest request = RequestParser::parse(request_data);
+
+        std::string path = "../serve" + request.path;
+        if (path == "../serve/") {
+            path = "../serve/index.html";
+        }
+
+        ResponseBuilder response_builder;
 
         try {
-            std::cout << path << '\n';
-            std::string content = readFile(path);
-            std::string contentType = getContentType(path);
-            std::string response = "HTTP/1.1 200 OK\r\n"
-                                   "Content-Type: " + contentType + "\r\n"
-                                   "Content-Length: " + std::to_string(content.length()) + "\r\n"
-                                   "\r\n" + content;
-            write(client_socket, response.c_str(), response.length());
+            std::string content = file_cache.get(path);
+            if (content.empty()) {
+                content = readFile(path);
+                file_cache.put(path, content);
+            }
+            std::string content_type = getContentType(path);
+            
+            response_builder.setStatus(200, "OK")
+                            .setHeader("Content-Type", content_type)
+                            .setBody(content);
         } catch (const std::runtime_error& e) {
-            std::cout << e.what() << '\n';
-            std::string response = "HTTP/1.1 404 Not Found\r\n"
-                                   "Content-Type: text/plain\r\n"
-                                   "Content-Length: 9\r\n"
-                                   "\r\nNot Found";
-            write(client_socket, response.c_str(), response.length());
+            response_builder.setStatus(404, "Not Found")
+                            .setHeader("Content-Type", "text/plain")
+                            .setBody("404 Not Found");
         }
 
+        std::string response = response_builder.build();
+        write(client_socket, response.c_str(), response.length());
         close(client_socket);
-        client_buffers.erase(client_socket);
-    }
+    };
+
+    thread_pool.enqueue(task);
 }
 
 std::string HTTPServer::getContentType(const std::string& path) {
