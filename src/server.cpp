@@ -3,7 +3,10 @@
 extern std::atomic<bool> running;
 
 HTTPServer::HTTPServer(int port)
-    : PORT(port), thread_pool(std::thread::hardware_concurrency()), file_cache(1024 * 1024 * 50)  // 50MB cache
+    : PORT(port), 
+      thread_pool(std::thread::hardware_concurrency()), 
+      file_cache(1024 * 1024 * 50),  // 50MB cache
+      method_handler(file_cache)
 {
     setupServerSocket();
     epoll_fd = epoll_create1(0);
@@ -68,56 +71,13 @@ void HTTPServer::handleClient(int client_socket) {
         }
 
         HTTPRequest request = RequestParser::parse(request_data);
+        std::string response = method_handler.handleRequest(request);
 
-        std::string path = "../serve" + request.path;
-        if (path == "../serve/") {
-            path = "../serve/index.html";
-        }
-
-        ResponseBuilder response_builder;
-
-        try {
-            std::string content = file_cache.get(path);
-            if (content.empty()) {
-                content = readFile(path);
-                file_cache.put(path, content);
-            }
-            std::string content_type = getContentType(path);
-            
-            response_builder.setStatus(200, "OK")
-                            .setHeader("Content-Type", content_type)
-                            .setBody(content);
-        } catch (const std::runtime_error& e) {
-            response_builder.setStatus(404, "Not Found")
-                            .setHeader("Content-Type", "text/plain")
-                            .setBody("404 Not Found");
-        }
-
-        std::string response = response_builder.build();
         write(client_socket, response.c_str(), response.length());
         close(client_socket);
     };
 
     thread_pool.enqueue(task);
-}
-
-std::string HTTPServer::getContentType(const std::string& path) {
-    std::string extension = std::filesystem::path(path).extension();
-    if (extension == ".html" || extension == ".htm") return "text/html";
-    if (extension == ".css") return "text/css";
-    if (extension == ".js") return "application/javascript";
-    if (extension == ".jpg" || extension == ".jpeg") return "image/jpeg";
-    if (extension == ".png") return "image/png";
-    if (extension == ".gif") return "image/gif";
-    return "text/plain";
-}
-
-std::string HTTPServer::readFile(const std::string& path) {
-    std::ifstream file(path, std::ios::binary);
-    if (!file) {
-        throw std::runtime_error("File not found");
-    }
-    return std::string((std::istreambuf_iterator<char>(file)), std::istreambuf_iterator<char>());
 }
 
 void HTTPServer::run() {
@@ -132,12 +92,10 @@ void HTTPServer::run() {
 
         for (int n = 0; n < nfds; ++n) {
             if (events[n].data.fd == server_fd) {
-                // New connection
                 while (true) {
                     int client_socket = accept4(server_fd, NULL, NULL, SOCK_NONBLOCK);
                     if (client_socket == -1) {
                         if (errno == EAGAIN || errno == EWOULDBLOCK) {
-                            // We have processed all incoming connections
                             break;
                         } else {
                             std::cerr << "Accept error" << std::endl;
@@ -147,7 +105,6 @@ void HTTPServer::run() {
                     addToEpoll(client_socket);
                 }
             } else {
-                // Client socket is ready for reading
                 handleClient(events[n].data.fd);
             }
         }

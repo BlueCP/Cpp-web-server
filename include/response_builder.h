@@ -11,6 +11,8 @@ public:
     ResponseBuilder& setBody(const std::string& body);
     std::string build();
 
+    static std::string getStatusText(int status_code);
+
 private:
     int status_code = 200;
     std::string status_text = "OK";

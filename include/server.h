@@ -15,6 +15,7 @@
 #include "file_cache.h"
 #include "request_parser.h"
 #include "response_builder.h"
+#include "http_method_handler.h"
 
 class HTTPServer {
 public:
@@ -26,8 +27,6 @@ public:
 private:
     void setupServerSocket();
     void handleClient(int client_socket);
-    std::string getContentType(const std::string& path);
-    std::string readFile(const std::string& path);
     void addToEpoll(int fd);
 
     int server_fd;
@@ -37,4 +36,5 @@ private:
     static constexpr int MAX_EVENTS = 64;
     ThreadPool thread_pool;
     FileCache file_cache;
+    HTTPMethodHandler method_handler;
 };
