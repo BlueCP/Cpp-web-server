@@ -1,6 +1,11 @@
 #include "server.h"
 
-extern std::atomic<bool> running;
+std::atomic<bool> running(true);
+
+void signal_handler(int signum) {
+    std::cout << "Interrupt signal (" << signum << ") received.\n";
+    running = false;
+}
 
 HTTPServer::HTTPServer(int port)
     : PORT(port), 
@@ -14,6 +19,7 @@ HTTPServer::HTTPServer(int port)
         throw std::runtime_error("Failed to create epoll file descriptor");
     }
     addToEpoll(server_fd);
+    signal(SIGINT, signal_handler);
 }
 
 HTTPServer::~HTTPServer() {

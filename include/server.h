@@ -10,6 +10,7 @@
 #include <netinet/in.h>
 #include <filesystem>
 #include <fstream>
+#include <csignal>
 
 #include "thread_pool.h"
 #include "file_cache.h"

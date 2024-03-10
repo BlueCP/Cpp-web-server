@@ -1,18 +1,9 @@
 #include <iostream>
-#include <csignal>
 #include <atomic>
 
-#include "server.h"
-
-std::atomic<bool> running(true);
-
-void signal_handler(int signum) {
-    std::cout << "Interrupt signal (" << signum << ") received.\n";
-    running = false;
-}
+#include "include/server.h"
 
 int main() {
-    signal(SIGINT, signal_handler);
     try {
         HTTPServer server;
         std::cout << "Server listening on port 8080" << std::endl;
