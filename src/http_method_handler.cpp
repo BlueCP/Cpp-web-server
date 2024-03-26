@@ -3,6 +3,10 @@
 HTTPMethodHandler::HTTPMethodHandler(FileCache& fc) : file_cache(fc) {}
 
 std::string HTTPMethodHandler::handleRequest(const HTTPRequest& request) {
+    if (auto result = router.get_route(request); result.has_value()) {
+        return *result;
+    }
+
     if (request.method == "GET") return handleGET(request);
     if (request.method == "POST") return handlePOST(request);
     if (request.method == "PUT") return handlePUT(request);

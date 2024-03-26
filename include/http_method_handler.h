@@ -6,6 +6,7 @@
 #include "request_parser.h"
 #include "response_builder.h"
 #include "file_cache.h"
+#include "http_router.h"
 
 class HTTPMethodHandler {
 public:
@@ -24,4 +25,5 @@ private:
     std::string readFile(const std::string& path);
 
     FileCache& file_cache;
+    HTTPRouter router;
 };
