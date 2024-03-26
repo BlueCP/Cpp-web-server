@@ -17,9 +17,9 @@ std::string HTTPMethodHandler::handleRequest(const HTTPRequest& request) {
 }
 
 std::string HTTPMethodHandler::handleGET(const HTTPRequest& request) {
-    std::string path = "../serve" + request.path;
-    if (path == "../serve/") {
-        path = "../serve/index.html";
+    std::string path = "serve" + request.path;
+    if (path == "serve/") {
+        path = "serve/index.html";
     }
 
     ResponseBuilder rb;

@@ -35,3 +35,4 @@
 CMakeLists.txt
 CMakePresets.json
 /.vscode
+/out
